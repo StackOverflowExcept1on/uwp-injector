@@ -11,5 +11,6 @@ if (NOT MSVC)
 endif ()
 
 # Loading all kinds of projects
+
 add_subdirectory(injector)
 add_subdirectory(library)
