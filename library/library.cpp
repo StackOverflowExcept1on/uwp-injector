@@ -12,7 +12,8 @@ BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /*
         case DLL_PROCESS_ATTACH:
         case DLL_THREAD_ATTACH: {
             PWSTR pLocalAppDataFolder;
-            SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &pLocalAppDataFolder);
+            SHGetKnownFolderPath(FOLDERID_LocalAppData, KNOWN_FOLDER_FLAG::KF_FLAG_DEFAULT, nullptr,
+                                 &pLocalAppDataFolder);
             localAppDataFolder = pLocalAppDataFolder;
             CoTaskMemFree(pLocalAppDataFolder);
 
