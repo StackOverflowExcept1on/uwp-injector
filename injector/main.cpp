@@ -79,6 +79,12 @@ public:
     }
 };
 
+#pragma code_seg(".text")
+
+__declspec(align(1), allocate(".text")) const WCHAR usage[] = L"Usage: injector CalculatorApp.exe library.dll\n";
+__declspec(align(1), allocate(".text")) const WCHAR kernel32[] = L"KERNEL32.DLL";
+__declspec(align(1), allocate(".text")) const char procLoadLibraryW[] = "LoadLibraryW";
+
 extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -88,8 +94,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     auto hArgvOwned = LocalMemoryHandle(argv);
     if (argc != 3) {
-        auto usage = L"Usage: injector CalculatorApp.exe library.dll\n";
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), usage, lstrlenW(usage), nullptr, nullptr);
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), usage, sizeof(usage) / sizeof(WCHAR), nullptr, nullptr);
         return InjectionResult::IncorrectArguments;
     }
 
@@ -211,8 +216,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
         return InjectionResult::WriteProcessMemoryFailed;
     }
 
-    auto loadLibraryW = GetProcAddress(GetModuleHandleW(L"KERNEL32.DLL"), "LoadLibraryW");
-
+    auto loadLibraryW = GetProcAddress(GetModuleHandleW(kernel32), procLoadLibraryW);
     HANDLE hThread = CreateRemoteThread(hProcessOwned.raw(), nullptr, 0,
                                         (LPTHREAD_START_ROUTINE) loadLibraryW, memoryOwned.raw(), 0, nullptr);
     if (!hThread) {
