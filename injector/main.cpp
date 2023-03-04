@@ -144,11 +144,8 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     *ptr = L'\\';
     ++ptr;
 
-    LPWSTR val = libraryName;
-    while (*val) {
+    for (LPWSTR val = libraryName; *val; ++val, ++ptr) {
         *ptr = *val;
-        ++val;
-        ++ptr;
     }
 
     {
