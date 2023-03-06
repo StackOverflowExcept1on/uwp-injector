@@ -4,7 +4,6 @@
 #include <string>
 #include <fstream>
 
-std::wstring localAppDataFolder;
 std::ofstream logFile;
 
 BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /* lpReserved */) {
@@ -14,7 +13,7 @@ BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /*
             PWSTR pLocalAppDataFolder;
             SHGetKnownFolderPath(FOLDERID_LocalAppData, KNOWN_FOLDER_FLAG::KF_FLAG_DEFAULT, nullptr,
                                  &pLocalAppDataFolder);
-            localAppDataFolder = pLocalAppDataFolder;
+            std::wstring localAppDataFolder = pLocalAppDataFolder;
             CoTaskMemFree(pLocalAppDataFolder);
 
             logFile.open(localAppDataFolder + L"\\log.txt");
