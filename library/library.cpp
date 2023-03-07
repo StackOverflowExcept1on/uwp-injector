@@ -1,8 +1,8 @@
 #include <windows.h>
 #include <shlobj.h>
 
-#include <string>
 #include <fstream>
+#include <filesystem>
 
 std::ofstream logFile;
 
@@ -12,10 +12,10 @@ BOOL APIENTRY DllMain(HMODULE /* hModule */, DWORD ul_reason_for_call, LPVOID /*
             PWSTR pLocalAppDataFolder;
             SHGetKnownFolderPath(FOLDERID_LocalAppData, KNOWN_FOLDER_FLAG::KF_FLAG_DEFAULT, nullptr,
                                  &pLocalAppDataFolder);
-            std::wstring localAppDataFolder = pLocalAppDataFolder;
+            std::filesystem::path localAppDataFolder(pLocalAppDataFolder);
             CoTaskMemFree(pLocalAppDataFolder);
 
-            logFile.open(localAppDataFolder + L"\\log.txt");
+            logFile.open(localAppDataFolder / "log.txt");
 
             logFile << "successfully loaded into process memory" << std::endl;
             logFile << "pid: " << GetCurrentProcessId() << std::endl;
