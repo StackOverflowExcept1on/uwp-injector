@@ -12,6 +12,7 @@ enum class InjectionResult : uint8_t {
     IncorrectArguments,
     CreateToolhelp32SnapshotFailed,
     ProcessNotFound,
+    CopyFileWFailed,
     CreateWellKnownSidFailed,
     GetNamedSecurityInfoWFailed,
     SetEntriesInAclWFailed,
@@ -82,6 +83,7 @@ public:
 #pragma code_seg(".text")
 
 __declspec(align(1), allocate(".text")) const WCHAR usage[] = L"Usage: injector CalculatorApp.exe library.dll\n";
+__declspec(align(1), allocate(".text")) const WCHAR filePrefix[] = L"injected_";
 __declspec(align(1), allocate(".text")) const WCHAR kernel32[] = L"KERNEL32.DLL";
 __declspec(align(1), allocate(".text")) const char procLoadLibraryW[] = "LoadLibraryW";
 
@@ -130,10 +132,43 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     //drop hSnapshotOwned
 
     const size_t size = MAX_PATH + 1;
-    WCHAR buffer[size];
+    WCHAR buffer1[size];
 
-    LPWSTR path = &buffer[0];
-    DWORD len = GetFullPathNameW(libraryName, size, path, nullptr);
+    LPWSTR path1 = &buffer1[0];
+    DWORD len = GetFullPathNameW(libraryName, size, path1, nullptr);
+
+    LPWSTR ptrEnd = &buffer1[len];
+    LPWSTR ptrFile = ptrEnd;
+    while (*ptrFile != L'\\') {
+        --ptrFile;
+    }
+    ++ptrFile;
+
+    size_t fileLen = ptrEnd - ptrFile;
+
+    WCHAR buffer2[size];
+
+    size_t copyLen = len - fileLen;
+    for (volatile size_t i = 0; i < copyLen; i = i + 1) { //don't use builtin memcpy
+        buffer2[i] = buffer1[i];
+    }
+
+    LPWSTR ptr = &buffer2[copyLen];
+    for (auto val = filePrefix; *val; ++val, ++ptr) {
+        *ptr = *val;
+    }
+
+    for (auto val = ptrFile; *val; ++val, ++ptr) {
+        *ptr = *val;
+    }
+
+    *ptr = L'\0';
+
+    LPWSTR path2 = &buffer2[0];
+
+    if (!CopyFileW(path1, path2, FALSE)) {
+        return InjectionResult::CopyFileWFailed;
+    }
 
     {
         uint8_t pSidData[SECURITY_MAX_SID_SIZE];
@@ -146,7 +181,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
         PACL pAcl;
         PSECURITY_DESCRIPTOR pSecurityDescriptor;
-        if (GetNamedSecurityInfoW(path, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+        if (GetNamedSecurityInfoW(path2, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
                                   nullptr, nullptr, &pAcl, nullptr, &pSecurityDescriptor) != ERROR_SUCCESS) {
             return InjectionResult::GetNamedSecurityInfoWFailed;
         }
@@ -173,7 +208,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
         auto hNewAclOwned = LocalMemoryHandle(pNewAcl);
 
-        if (SetNamedSecurityInfoW(path, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+        if (SetNamedSecurityInfoW(path2, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
                                   nullptr, nullptr, hNewAclOwned.raw(), nullptr) != ERROR_SUCCESS) {
             return InjectionResult::SetNamedSecurityInfoWFailed;
         }
@@ -188,7 +223,8 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     Handle hProcessOwned = Handle(hProcess);
 
-    SIZE_T pathSize = len * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
+    const SIZE_T filePrefixLen = sizeof(filePrefix) / sizeof(WCHAR) - 1;
+    SIZE_T pathSize = len * sizeof(WCHAR) + filePrefixLen * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
     LPVOID address = VirtualAllocEx(hProcessOwned.raw(), nullptr, pathSize,
                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!address) {
@@ -196,7 +232,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     }
 
     ProcessMemory memoryOwned = ProcessMemory(hProcessOwned.raw(), address);
-    if (!memoryOwned.write(path, pathSize)) {
+    if (!memoryOwned.write(path2, pathSize)) {
         return InjectionResult::WriteProcessMemoryFailed;
     }
 
