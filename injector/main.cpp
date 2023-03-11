@@ -132,21 +132,8 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     const size_t size = MAX_PATH + 1;
     WCHAR buffer[size];
 
-    for (WCHAR &c: buffer) {
-        c = L'\0';
-    }
-
     LPWSTR path = &buffer[0];
-    DWORD len = GetCurrentDirectoryW(size, path);
-
-    LPWSTR ptr = &buffer[len];
-
-    *ptr = L'\\';
-    ++ptr;
-
-    for (LPWSTR val = libraryName; *val; ++val, ++ptr) {
-        *ptr = *val;
-    }
+    DWORD len = GetFullPathNameW(libraryName, size, path, nullptr);
 
     {
         uint8_t pSidData[SECURITY_MAX_SID_SIZE];
