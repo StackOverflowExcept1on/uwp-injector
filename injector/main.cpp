@@ -188,7 +188,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     Handle hProcessOwned = Handle(hProcess);
 
-    SIZE_T pathSize = lstrlenW(path) * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
+    SIZE_T pathSize = len * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
     LPVOID address = VirtualAllocEx(hProcessOwned.raw(), nullptr, pathSize,
                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!address) {

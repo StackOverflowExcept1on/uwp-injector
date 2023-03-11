@@ -6,6 +6,7 @@ timeout 2 > NUL
 
 cd build\bin
 injector CalculatorApp.exe library.dll
+echo %errorlevel%
 
 timeout 2 > NUL
 
