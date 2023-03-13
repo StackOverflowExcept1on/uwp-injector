@@ -86,6 +86,7 @@ __declspec(align(1), allocate(".text")) const WCHAR usage[] = L"Usage: injector 
 __declspec(align(1), allocate(".text")) const WCHAR filePrefix[] = L"injected_";
 __declspec(align(1), allocate(".text")) const WCHAR kernel32[] = L"KERNEL32.DLL";
 __declspec(align(1), allocate(".text")) const char procLoadLibraryW[] = "LoadLibraryW";
+__declspec(align(1), allocate(".text")) const char procFreeLibrary[] = "FreeLibrary";
 
 extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     int argc;
@@ -166,6 +167,51 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     LPWSTR path2 = &buffer2[0];
 
+    HMODULE previousModule;
+
+    {
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processId);
+        if (hSnapshot == INVALID_HANDLE_VALUE) {
+            return InjectionResult::CreateToolhelp32SnapshotFailed;
+        }
+
+        Handle hSnapshotOwned = Handle(hSnapshot);
+
+        MODULEENTRY32W moduleEntry;
+        moduleEntry.dwSize = sizeof(moduleEntry);
+
+        previousModule = nullptr;
+        while (Module32NextW(hSnapshotOwned.raw(), &moduleEntry)) {
+            if (!lstrcmpW(moduleEntry.szExePath, path2)) {
+                previousModule = moduleEntry.hModule;
+                break;
+            }
+        }
+    }
+
+    //drop hSnapshotOwned
+
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
+    if (!hProcess) {
+        return InjectionResult::OpenProcessFailed;
+    }
+
+    Handle hProcessOwned = Handle(hProcess);
+
+    if (previousModule) {
+        auto freeLibrary = GetProcAddress(GetModuleHandleW(kernel32), procFreeLibrary);
+        HANDLE hThread = CreateRemoteThread(hProcessOwned.raw(), nullptr, 0,
+                                            (LPTHREAD_START_ROUTINE) freeLibrary, previousModule, 0, nullptr);
+        if (!hThread) {
+            return InjectionResult::CreateRemoteThreadFailed;
+        }
+
+        Handle hThreadOwned = Handle(hThread);
+        if (WaitForSingleObject(hThreadOwned.raw(), INFINITE) == WAIT_FAILED) {
+            return InjectionResult::WaitForSingleObjectFailed;
+        }
+    }
+
     if (!CopyFileW(path1, path2, FALSE)) {
         return InjectionResult::CopyFileWFailed;
     }
@@ -215,13 +261,6 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     }
 
     //drop hSecurityDescriptorOwned, hNewAclOwned
-
-    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
-    if (!hProcess) {
-        return InjectionResult::OpenProcessFailed;
-    }
-
-    Handle hProcessOwned = Handle(hProcess);
 
     const SIZE_T filePrefixLen = sizeof(filePrefix) / sizeof(WCHAR) - 1;
     SIZE_T pathSize = len * sizeof(WCHAR) + filePrefixLen * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
