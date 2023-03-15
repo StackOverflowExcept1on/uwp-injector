@@ -15,6 +15,3 @@ for /f "tokens=*" %%i in (.gitignore) do (
     del /f /q !filename!
   )
 )
-
-cd projects\csharp\patcher
-call clean.bat
