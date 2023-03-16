@@ -15,11 +15,3 @@ for /f "tokens=*" %%i in (.gitignore) do (
     del /f /q !filename!
   )
 )
-
-cd injector
-call clean.bat
-cd ..
-
-cd library
-call clean.bat
-cd ..
