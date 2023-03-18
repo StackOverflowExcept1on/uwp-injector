@@ -82,7 +82,7 @@ public:
 
 #pragma code_seg(".text")
 
-__declspec(align(1), allocate(".text")) const WCHAR usage[] = L"Usage: injector CalculatorApp.exe library.dll\n";
+__declspec(align(1), allocate(".text")) const WCHAR usage[] = L"Usage: injector process.exe library.dll\n";
 __declspec(align(1), allocate(".text")) const WCHAR filePrefix[] = L"injected_";
 __declspec(align(1), allocate(".text")) const WCHAR kernel32[] = L"KERNEL32.DLL";
 __declspec(align(1), allocate(".text")) const char procLoadLibraryW[] = "LoadLibraryW";
