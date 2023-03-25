@@ -12,6 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - name: Patch MSVC linker
+        run: |
+          cargo install anonlink
+          anonlink
+
       - name: Build project
         run: _build.bat
         shell: cmd
