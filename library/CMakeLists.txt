@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.20)
 project(library)
 
-# Checking for MSVC toolchain with C++20 features & targeting for Windows Store
+# Checking for MSVC toolchain with C++23 features & targeting for Windows Store
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (NOT MSVC)
