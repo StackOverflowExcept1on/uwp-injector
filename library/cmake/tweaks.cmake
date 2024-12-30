@@ -3,6 +3,7 @@ function(set_tweaks_options target)
     # Some flags to optimize for binary file size
     target_link_options(${target} PRIVATE
             /MANIFEST:NO
+            /EMITTOOLVERSIONINFO:NO
             /EMITPOGOPHASEINFO
             /DEBUG:NONE)
 

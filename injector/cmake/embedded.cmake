@@ -17,6 +17,7 @@ function(set_embedded_options target)
             /MERGE:.rdata=.text
             /MERGE:.pdata=.text
             /NODEFAULTLIB
+            /EMITTOOLVERSIONINFO:NO
             /EMITPOGOPHASEINFO
             /DEBUG:NONE
             /STUB:${CMAKE_SOURCE_DIR}/link/stub.exe)
