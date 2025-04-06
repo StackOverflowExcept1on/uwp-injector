@@ -6,7 +6,7 @@ function(set_embedded_options target)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
 
     # Turn off buffer security check, exception handling
-    target_compile_options(${target} PRIVATE /GS- /EHs-c-)
+    target_compile_options(${target} PRIVATE /GL /GS- /EHs-c-)
     # Some flags to optimize for binary file size
     target_link_options(${target} PRIVATE
             /DRIVER
