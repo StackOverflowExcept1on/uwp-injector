@@ -7,6 +7,6 @@ function(set_tweaks_options target)
             /EMITPOGOPHASEINFO
             /DEBUG:NONE)
 
-    # Apply pedantic flags (for UWP runtime)
-    target_compile_options(${target} PRIVATE /permissive- /WX)
+    # Apply pedantic flags
+    target_compile_options(${target} PRIVATE /W4 /permissive- /WX)
 endfunction()

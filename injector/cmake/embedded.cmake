@@ -5,6 +5,7 @@ function(set_embedded_options target)
     string(REPLACE "/EHsc " "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
 
+    # Enable whole program optimization
     # Turn off buffer security check, exception handling
     target_compile_options(${target} PRIVATE /GL /GS- /EHs-c-)
     # Some flags to optimize for binary file size
