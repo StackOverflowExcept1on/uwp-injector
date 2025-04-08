@@ -10,6 +10,7 @@ function(set_embedded_options target)
     target_compile_options(${target} PRIVATE /GL /GS- /EHs-c-)
     # Some flags to optimize for binary file size
     target_link_options(${target} PRIVATE
+            /LTCG
             /DRIVER
             #/SECTION:.text,,ALIGN=16
             /MANIFEST:NO
