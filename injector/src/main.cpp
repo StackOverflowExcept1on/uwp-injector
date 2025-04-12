@@ -9,9 +9,14 @@
 enum class InjectionResult : uint8_t {
     Success,
     CommandLineToArgvWFailed,
+    GetStdHandleFailed,
+    WriteConsoleWFailed,
     IncorrectArguments,
     CreateToolhelp32SnapshotFailed,
+    Process32FirstWFailed,
     ProcessNotFound,
+    GetFullPathNameWFailed,
+    Module32FirstWFailed,
     CopyFileWFailed,
     CreateWellKnownSidFailed,
     GetNamedSecurityInfoWFailed,
@@ -31,7 +36,7 @@ private:
 public:
     explicit Handle(HANDLE handle) : handle(handle) {}
 
-    HANDLE raw() {
+    operator HANDLE() const {
         return handle;
     }
 
@@ -48,7 +53,7 @@ private:
 public:
     explicit LocalMemoryHandle(T val) : val(val) {}
 
-    T raw() {
+    operator T() const {
         return val;
     }
 
@@ -65,14 +70,13 @@ private:
 public:
     explicit ProcessMemory(HANDLE hProcess, LPVOID address) : hProcess(hProcess), address(address) {}
 
-    HANDLE raw() {
+    operator LPVOID() const {
         return address;
     }
 
     bool write(LPWSTR buffer, SIZE_T size) {
         SIZE_T written = 0;
-        return WriteProcessMemory(hProcess, address, (LPCVOID) buffer, size, &written) &&
-               written == size;
+        return WriteProcessMemory(hProcess, address, buffer, size, &written) && written == size;
     }
 
     ~ProcessMemory() {
@@ -88,7 +92,7 @@ __declspec(align(1), allocate(".text")) const WCHAR kernel32[] = L"KERNEL32.DLL"
 __declspec(align(1), allocate(".text")) const char procLoadLibraryW[] = "LoadLibraryW";
 __declspec(align(1), allocate(".text")) const char procFreeLibrary[] = "FreeLibrary";
 
-extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
+extern "C" /*DWORD*/ InjectionResult WINAPI mainCRTStartup() {
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argv) {
@@ -96,13 +100,24 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
     }
 
     auto hArgvOwned = LocalMemoryHandle(argv);
+
     if (argc != 3) {
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), usage, sizeof(usage) / sizeof(WCHAR), nullptr, nullptr);
+        HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hConsoleOutput == INVALID_HANDLE_VALUE || !hConsoleOutput) {
+            return InjectionResult::GetStdHandleFailed;
+        }
+
+        const DWORD usageLen = sizeof(usage) / sizeof(WCHAR) - 1;
+        DWORD written = 0;
+        if (!(WriteConsoleW(hConsoleOutput, usage, usageLen, &written, nullptr) && written == usageLen)) {
+            return InjectionResult::WriteConsoleWFailed;
+        }
+
         return InjectionResult::IncorrectArguments;
     }
 
-    LPWSTR processName = hArgvOwned.raw()[1];
-    LPWSTR libraryName = hArgvOwned.raw()[2];
+    LPWSTR processName = hArgvOwned[1];
+    LPWSTR libraryName = hArgvOwned[2];
 
     DWORD processId;
 
@@ -117,13 +132,17 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
         PROCESSENTRY32W processEntry;
         processEntry.dwSize = sizeof(processEntry);
 
+        if (!Process32FirstW(hSnapshotOwned, &processEntry)) {
+            return InjectionResult::Process32FirstWFailed;
+        }
+
         processId = 0;
-        while (Process32NextW(hSnapshotOwned.raw(), &processEntry)) {
+        do {
             if (!lstrcmpW(processEntry.szExeFile, processName)) {
                 processId = processEntry.th32ProcessID;
                 break;
             }
-        }
+        } while (Process32NextW(hSnapshotOwned, &processEntry));
 
         if (processId == 0) {
             return InjectionResult::ProcessNotFound;
@@ -132,24 +151,24 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     //drop hSnapshotOwned
 
-    const size_t size = MAX_PATH + 1;
-    WCHAR buffer1[size];
+    const SIZE_T filePrefixLen = sizeof(filePrefix) / sizeof(WCHAR) - 1;
+    const size_t size1 = MAX_PATH - filePrefixLen;
+    WCHAR buffer1[size1]; //allocate buffer of smaller size than MAX_PATH (including null-terminator)
 
     LPWSTR path1 = &buffer1[0];
-    DWORD len = GetFullPathNameW(libraryName, size, path1, nullptr);
-
-    LPWSTR ptrEnd = &buffer1[len];
-    LPWSTR ptrFile = ptrEnd;
-    while (*ptrFile != L'\\') {
-        --ptrFile;
+    LPWSTR ptrFilePart = nullptr;
+    DWORD pathLen = GetFullPathNameW(libraryName, size1, path1, &ptrFilePart);
+    if (pathLen > size1 || pathLen == 0 || !ptrFilePart) {
+        return InjectionResult::GetFullPathNameWFailed;
     }
-    ++ptrFile;
 
-    size_t fileLen = ptrEnd - ptrFile;
+    LPWSTR ptrEnd = &buffer1[pathLen];
+    size_t fileLen = ptrEnd - ptrFilePart;
 
-    WCHAR buffer2[size];
+    const size_t size2 = MAX_PATH;
+    WCHAR buffer2[size2]; //allocate larger buffer (including prefix and null-terminator)
 
-    size_t copyLen = len - fileLen;
+    size_t copyLen = pathLen - fileLen;
     for (volatile size_t i = 0; i < copyLen; i = i + 1) { //don't use builtin memcpy
         buffer2[i] = buffer1[i];
     }
@@ -159,7 +178,7 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
         *ptr = *val;
     }
 
-    for (auto val = ptrFile; *val; ++val, ++ptr) {
+    for (auto val = ptrFilePart; *val; ++val, ++ptr) {
         *ptr = *val;
     }
 
@@ -180,13 +199,17 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
         MODULEENTRY32W moduleEntry;
         moduleEntry.dwSize = sizeof(moduleEntry);
 
+        if (!Module32FirstW(hSnapshotOwned, &moduleEntry)) {
+            return InjectionResult::Module32FirstWFailed;
+        }
+
         previousModule = nullptr;
-        while (Module32NextW(hSnapshotOwned.raw(), &moduleEntry)) {
+        do {
             if (!lstrcmpW(moduleEntry.szExePath, path2)) {
                 previousModule = moduleEntry.hModule;
                 break;
             }
-        }
+        } while (Module32NextW(hSnapshotOwned, &moduleEntry));
     }
 
     //drop hSnapshotOwned
@@ -200,14 +223,15 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
     if (previousModule) {
         auto freeLibrary = GetProcAddress(GetModuleHandleW(kernel32), procFreeLibrary);
-        HANDLE hThread = CreateRemoteThread(hProcessOwned.raw(), nullptr, 0,
-                                            (LPTHREAD_START_ROUTINE) freeLibrary, previousModule, 0, nullptr);
+        HANDLE hThread = CreateRemoteThread(hProcessOwned, nullptr, 0, (LPTHREAD_START_ROUTINE) freeLibrary,
+                                            previousModule, 0, nullptr);
         if (!hThread) {
             return InjectionResult::CreateRemoteThreadFailed;
         }
 
         Handle hThreadOwned = Handle(hThread);
-        if (WaitForSingleObject(hThreadOwned.raw(), INFINITE) == WAIT_FAILED) {
+
+        if (WaitForSingleObject(hThreadOwned, INFINITE) == WAIT_FAILED) {
             return InjectionResult::WaitForSingleObjectFailed;
         }
     }
@@ -254,36 +278,34 @@ extern "C" /*DWORD*/ InjectionResult mainCRTStartup() {
 
         auto hNewAclOwned = LocalMemoryHandle(pNewAcl);
 
-        if (SetNamedSecurityInfoW(path2, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
-                                  nullptr, nullptr, hNewAclOwned.raw(), nullptr) != ERROR_SUCCESS) {
+        if (SetNamedSecurityInfoW(path2, SE_OBJECT_TYPE::SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr,
+                                  hNewAclOwned, nullptr) != ERROR_SUCCESS) {
             return InjectionResult::SetNamedSecurityInfoWFailed;
         }
     }
 
     //drop hSecurityDescriptorOwned, hNewAclOwned
 
-    const SIZE_T filePrefixLen = sizeof(filePrefix) / sizeof(WCHAR) - 1;
-    SIZE_T pathSize = len * sizeof(WCHAR) + filePrefixLen * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
-    LPVOID address = VirtualAllocEx(hProcessOwned.raw(), nullptr, pathSize,
-                                    MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    SIZE_T pathSize = pathLen * sizeof(WCHAR) + filePrefixLen * sizeof(WCHAR) + sizeof(WCHAR); //null terminated wide string
+    LPVOID address = VirtualAllocEx(hProcessOwned, nullptr, pathSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!address) {
         return InjectionResult::VirtualAllocExFailed;
     }
 
-    ProcessMemory memoryOwned = ProcessMemory(hProcessOwned.raw(), address);
+    ProcessMemory memoryOwned = ProcessMemory(hProcessOwned, address);
     if (!memoryOwned.write(path2, pathSize)) {
         return InjectionResult::WriteProcessMemoryFailed;
     }
 
     auto loadLibraryW = GetProcAddress(GetModuleHandleW(kernel32), procLoadLibraryW);
-    HANDLE hThread = CreateRemoteThread(hProcessOwned.raw(), nullptr, 0,
-                                        (LPTHREAD_START_ROUTINE) loadLibraryW, memoryOwned.raw(), 0, nullptr);
+    HANDLE hThread = CreateRemoteThread(hProcessOwned, nullptr, 0, (LPTHREAD_START_ROUTINE) loadLibraryW, memoryOwned,
+                                        0, nullptr);
     if (!hThread) {
         return InjectionResult::CreateRemoteThreadFailed;
     }
 
     Handle hThreadOwned = Handle(hThread);
-    if (WaitForSingleObject(hThreadOwned.raw(), INFINITE) == WAIT_FAILED) {
+    if (WaitForSingleObject(hThreadOwned, INFINITE) == WAIT_FAILED) {
         return InjectionResult::WaitForSingleObjectFailed;
     }
 
