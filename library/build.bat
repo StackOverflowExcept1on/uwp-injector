@@ -6,14 +6,11 @@ if not exist build mkdir build
 cd build
 
 set vswhere="%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-set vcvarsLookup=call %vswhere% -latest -property installationPath
+set cmakeLookup=call %vswhere% -latest -requires Microsoft.VisualStudio.Component.VC.CMake.Project -find Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
 
-for /f "tokens=*" %%i in ('%vcvarsLookup%') do set vcvars="%%i\VC\Auxiliary\Build\vcvars64.bat"
+for /f "tokens=*" %%i in ('%cmakeLookup%') do set cmake="%%i"
 
-call %vcvars% uwp
-
-cmake -G Ninja -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10 ..
-cmake --build .
-cmake --install .
+%cmake% -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 ..
+%cmake% --build . --config %CMAKE_BUILD_TYPE% --target INSTALL
 
 cd ..

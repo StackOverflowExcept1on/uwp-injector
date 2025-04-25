@@ -1,5 +1,5 @@
 #include <windows.h>
-#include <shlobj.h>
+#include <winrt/Windows.Storage.h>
 
 #include <mutex>
 #include <fstream>
@@ -11,13 +11,8 @@ class Logger {
     std::ofstream logFile;
 
     Logger() {
-        PWSTR pLocalAppDataFolder;
-        if (SHGetKnownFolderPath(FOLDERID_LocalAppData, KNOWN_FOLDER_FLAG::KF_FLAG_DEFAULT, nullptr,
-                                 &pLocalAppDataFolder) != S_OK) {
-            std::abort();
-        }
-        std::filesystem::path localAppDataFolder(pLocalAppDataFolder);
-        CoTaskMemFree(pLocalAppDataFolder);
+        winrt::hstring localFolderPath = winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
+        std::filesystem::path localAppDataFolder(localFolderPath.c_str());
         logFile = std::ofstream(localAppDataFolder / "log.txt", std::ofstream::app);
     }
 

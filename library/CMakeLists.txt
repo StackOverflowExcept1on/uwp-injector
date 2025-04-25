@@ -22,5 +22,4 @@ include(cmake/tweaks.cmake)
 
 add_library(${PROJECT_NAME} SHARED src/library.cpp)
 set_tweaks_options(${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME} PRIVATE Shell32 Ole32 Kernel32)
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_BINARY_DIR}/bin)

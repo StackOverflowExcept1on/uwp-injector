@@ -10,19 +10,19 @@ function(set_embedded_options target)
     target_compile_options(${target} PRIVATE /GL /GS- /EHs-c-)
     # Some flags to optimize for binary file size
     target_link_options(${target} PRIVATE
-            /LTCG
-            /DRIVER
-            #/SECTION:.text,,ALIGN=16
-            /MANIFEST:NO
-            /ALIGN:16
-            /FILEALIGN:1
-            /MERGE:.rdata=.text
-            /MERGE:.pdata=.text
-            /NODEFAULTLIB
-            /EMITTOOLVERSIONINFO:NO
-            /EMITPOGOPHASEINFO
-            /DEBUG:NONE
-            /STUB:${CMAKE_SOURCE_DIR}/link/stub.exe)
+        /LTCG
+        /DRIVER
+        #/SECTION:.text,,ALIGN=16
+        /MANIFEST:NO
+        /ALIGN:16
+        /FILEALIGN:1
+        /MERGE:.rdata=.text
+        /MERGE:.pdata=.text
+        /NODEFAULTLIB
+        /EMITTOOLVERSIONINFO:NO
+        /EMITPOGOPHASEINFO
+        /DEBUG:NONE
+        /STUB:${CMAKE_SOURCE_DIR}/link/stub.exe)
 
     # Apply pedantic flags
     target_compile_options(${target} PRIVATE /W4 /permissive- /WX)
