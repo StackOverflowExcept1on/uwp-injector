@@ -12,8 +12,8 @@ class Logger {
 
     Logger() {
         winrt::hstring localFolderPath = winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
-        std::filesystem::path localAppDataFolder(localFolderPath.c_str());
-        logFile = std::ofstream(localAppDataFolder / "log.txt", std::ofstream::app);
+        std::filesystem::path localFolder(localFolderPath.c_str());
+        logFile = std::ofstream(localFolder / "log.txt", std::ofstream::app);
     }
 
     static Logger &getInstance() {
