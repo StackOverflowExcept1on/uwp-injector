@@ -9,7 +9,7 @@ Also, it can be used to inject DLL into Windows Store games.
 
 ### Requirements
 
-- Visual Studio 2022 https://visualstudio.microsoft.com/en/vs/ with enabled:
+- Visual Studio 2026 https://visualstudio.microsoft.com/en/vs/ with enabled:
     - Desktop development with C++
     - Universal Windows Platform development
 
